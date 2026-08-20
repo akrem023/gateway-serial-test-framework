@@ -1,0 +1,5 @@
+.env
+__pycache__/
+*.pyc
+custom_tests.py
+test_results/

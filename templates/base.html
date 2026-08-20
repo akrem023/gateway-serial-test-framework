@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}Gateway Serial Test Framework{% endblock %}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #090d0b;
+    --panel: #10160f;
+    --panel-2: #141c17;
+    --line: #223028;
+    --line-soft: #1a251f;
+    --text: #e6e8e1;
+    --text-dim: #8a9690;
+    --text-faint: #566058;
+    --phosphor: #4fe3a1;
+    --phosphor-dim: #2f8f66;
+    --phosphor-glow: rgba(79,227,161,0.35);
+    --amber: #e6a439;
+    --red: #e2645a;
+    --blue: #5fb3e6;
+    --violet: #b48ce6;
+    --mono: 'JetBrains Mono', monospace;
+    --mono-head: 'IBM Plex Mono', monospace;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{
+    background:
+      radial-gradient(ellipse at top left, rgba(79,227,161,0.07), transparent 55%),
+      radial-gradient(ellipse at bottom right, rgba(95,179,230,0.05), transparent 50%),
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.012) 0px, rgba(255,255,255,0.012) 1px, transparent 1px, transparent 3px),
+      var(--bg);
+    color: var(--text); font-family: var(--mono); min-height: 100vh; padding: 24px;
+  }
+  .wrap{ max-width: 1280px; margin: 0 auto; }
+  ::-webkit-scrollbar{ width:8px; height:8px; }
+  ::-webkit-scrollbar-thumb{ background: var(--line); border-radius:4px; }
+
+  /* ================= NAV ================= */
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    border:1px solid var(--line); background:var(--panel);
+    padding:14px 22px; border-radius:5px; margin-bottom:20px;
+    box-shadow: 0 0 0 1px rgba(79,227,161,0.03), 0 8px 24px -12px rgba(0,0,0,0.6);
+    flex-wrap: wrap; gap: 14px;
+  }
+  .brand{ display:flex; align-items:center; gap:12px; }
+  .brand-icon{ width:30px; height:30px; flex-shrink:0; }
+  .brand h1{ font-family: var(--mono-head); font-size:14px; font-weight:600; letter-spacing: 0.1em; text-transform:uppercase; color:var(--text); }
+  .brand .sub{ font-size:10.5px; color:var(--text-faint); letter-spacing:0.06em; display:block; margin-top:1px; }
+
+  .nav{ display:flex; gap:6px; }
+  .nav a{
+    font-family:var(--mono); font-size:11px; letter-spacing:0.06em; text-transform:uppercase;
+    padding:8px 14px; border-radius:3px; text-decoration:none; color:var(--text-dim);
+    border:1px solid transparent; transition: all .12s;
+  }
+  .nav a:hover{ color:var(--text); background:rgba(255,255,255,0.03); }
+  .nav a.active{ color:var(--phosphor); border-color:var(--phosphor-dim); background:rgba(79,227,161,0.07); }
+
+  .pulse-wrap{ display:flex; align-items:center; gap:10px; }
+  .pulse-svg{ width:70px; height:20px; }
+  .pulse-line{ fill:none; stroke:var(--phosphor); stroke-width:1.6; stroke-dasharray: 220; stroke-dashoffset: 220; animation: pulse-draw 2.4s linear infinite; filter: drop-shadow(0 0 3px var(--phosphor-glow)); }
+  @keyframes pulse-draw{ to{ stroke-dashoffset: -220; } }
+  .status{ display:flex; align-items:center; gap:7px; font-size:10.5px; color:var(--text-dim); letter-spacing:0.05em; }
+  .led{ width:8px; height:8px; border-radius:50%; background:var(--amber); box-shadow:0 0 8px var(--amber); }
+  .led.on{ background:var(--phosphor); box-shadow:0 0 8px var(--phosphor); }
+
+  /* ================= PANELS ================= */
+  .panel{ border:1px solid var(--line); background:var(--panel); border-radius:5px; padding:18px 20px; margin-bottom:20px; box-shadow: 0 8px 24px -16px rgba(0,0,0,0.5); }
+  .panel h2{ font-family: var(--mono-head); font-size:11px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:var(--phosphor); margin-bottom:14px; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .panel h2 .t{ display:flex; align-items:center; gap:8px; }
+  .panel h2 .t::before{ content:'›'; color:var(--phosphor-dim); }
+
+  .field{ margin-bottom:14px; }
+  .field label{ display:block; font-size:10.5px; letter-spacing:0.06em; text-transform:uppercase; color:var(--text-faint); margin-bottom:5px; }
+  .field textarea, .field input{
+    width:100%; background:var(--panel-2); border:1px solid var(--line-soft); color:var(--text);
+    font-family:var(--mono); font-size:13px; padding:10px 12px; border-radius:3px; outline:none; transition: border-color .12s;
+  }
+  .field textarea:focus, .field input:focus{ border-color: var(--phosphor-dim); box-shadow: 0 0 0 3px rgba(79,227,161,0.08); }
+  .field textarea{ min-height:74px; resize:vertical; }
+  .field .default-badge{ font-size:9.5px; color:var(--phosphor-dim); margin-left:6px; }
+  .row2{ display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+
+  .btn{
+    font-family:var(--mono); font-size:11.5px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase;
+    padding:11px 20px; border-radius:3px; border:1px solid var(--phosphor-dim);
+    background: rgba(79,227,161,0.08); color:var(--phosphor); cursor:pointer; transition: all .12s;
+  }
+  .btn:hover{ background: rgba(79,227,161,0.16); box-shadow: 0 0 14px -2px var(--phosphor-glow); }
+  .btn:disabled{ opacity:0.4; cursor:not-allowed; box-shadow:none; }
+  .btn.secondary{ border-color:var(--line-soft); background:transparent; color:var(--text-dim); }
+  .actions{ display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; }
+
+  .code-box{ background:#060907; border:1px solid var(--line); border-radius:3px; padding:14px 16px; font-size:12.5px; line-height:1.6; color:var(--phosphor); white-space:pre; overflow-x:auto; max-height:320px; overflow-y:auto; margin-top:14px; }
+  .code-box .placeholder{ color:var(--text-faint); }
+
+  .alert{ font-size:12px; padding:9px 12px; border-radius:3px; margin-top:10px; line-height:1.5; }
+  .alert.error{ background: rgba(226,100,90,0.1); border:1px solid var(--red); color:#f0a9a3; }
+  .alert.warn{ background: rgba(230,164,57,0.1); border:1px solid var(--amber); color:#f2c581; }
+  .alert.ok{ background: rgba(79,227,161,0.1); border:1px solid var(--phosphor-dim); color:var(--phosphor); }
+
+  /* ================= TOAST ================= */
+  #toast-stack{ position:fixed; top:20px; right:20px; z-index:1000; display:flex; flex-direction:column; gap:10px; }
+  .toast{
+    display:flex; align-items:center; gap:10px; min-width:280px; max-width:360px;
+    background:var(--panel); border:1px solid var(--phosphor-dim); border-radius:5px;
+    padding:14px 16px; box-shadow: 0 0 30px -6px var(--phosphor-glow), 0 12px 30px -10px rgba(0,0,0,0.6);
+    animation: toast-in .25s ease-out;
+    font-size:12.5px; color:var(--text);
+  }
+  .toast.error{ border-color: var(--red); box-shadow: 0 0 30px -6px rgba(226,100,90,0.35), 0 12px 30px -10px rgba(0,0,0,0.6); }
+  .toast .icon{ width:20px; height:20px; flex-shrink:0; }
+  .toast.error .icon{ color: var(--red); }
+  .toast.ok .icon{ color: var(--phosphor); }
+  .toast .msg{ flex:1; line-height:1.4; }
+  .toast .close{ cursor:pointer; color:var(--text-faint); font-size:14px; line-height:1; padding:2px; }
+  .toast.leaving{ animation: toast-out .2s ease-in forwards; }
+  @keyframes toast-in{ from{ opacity:0; transform: translateX(20px); } to{ opacity:1; transform: translateX(0); } }
+  @keyframes toast-out{ to{ opacity:0; transform: translateX(20px); } }
+
+  /* ================= EXPLAIN MODAL ================= */
+  #modal-overlay{ position:fixed; inset:0; background:rgba(5,8,6,0.75); backdrop-filter: blur(2px); display:none; align-items:center; justify-content:center; z-index:500; padding:20px; }
+  #modal-overlay.show{ display:flex; }
+  #modal-box{ background:var(--panel); border:1px solid var(--phosphor-dim); border-radius:6px; max-width:560px; width:100%; padding:22px 24px; box-shadow: 0 0 40px -10px var(--phosphor-glow), 0 20px 60px -20px rgba(0,0,0,0.7); }
+  #modal-title{ font-family:var(--mono-head); font-size:12px; color:var(--phosphor); letter-spacing:0.1em; text-transform:uppercase; margin-bottom:6px; }
+  #modal-sub{ font-size:11px; color:var(--text-faint); margin-bottom:14px; }
+  #modal-body{ font-size:13px; line-height:1.65; color:var(--text); min-height:60px; background:#060907; border:1px solid var(--line-soft); border-radius:3px; padding:14px 16px; }
+  #modal-body .typing-cursor{ display:inline-block; width:7px; height:14px; background:var(--phosphor); animation: blink 0.9s step-end infinite; vertical-align:middle; margin-left:2px; }
+  @keyframes blink{ 50%{ opacity:0; } }
+  #modal-close{ margin-top:16px; }
+
+  {% block extra_style %}{% endblock %}
+</style>
+</head>
+<body>
+
+<div id="toast-stack"></div>
+
+<div class="wrap">
+  <div class="topbar">
+    <div class="brand">
+      <svg class="brand-icon" viewBox="0 0 32 32" fill="none">
+        <rect x="3" y="7" width="26" height="18" rx="2" stroke="var(--phosphor)" stroke-width="1.4"/>
+        <circle cx="9" cy="12" r="1.4" fill="var(--phosphor)"/>
+        <circle cx="14" cy="12" r="1.4" fill="var(--amber)"/>
+        <path d="M7 17h18M7 20h12" stroke="var(--phosphor-dim)" stroke-width="1.2" stroke-linecap="round"/>
+        <path d="M11 3v4M21 3v4" stroke="var(--phosphor)" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <div>
+        <h1>Gateway Test Framework</h1>
+        <span class="sub">control console</span>
+      </div>
+    </div>
+    <nav class="nav">
+      <a href="/" class="{{ 'active' if active=='dashboard' else '' }}">Dashboard</a>
+      <a href="/add/manual" class="{{ 'active' if active=='manual' else '' }}">Add Test · Manual</a>
+      <a href="/add/ai" class="{{ 'active' if active=='ai' else '' }}">Add Test · AI</a>
+    </nav>
+    <div class="pulse-wrap">
+      <svg class="pulse-svg" viewBox="0 0 90 24" preserveAspectRatio="none">
+        <path class="pulse-line" d="M0,12 L18,12 L23,4 L28,20 L33,12 L90,12" />
+      </svg>
+      <div class="status"><span class="led" id="status-led"></span><span id="status-text">READY</span></div>
+    </div>
+  </div>
+
+  {% block content %}{% endblock %}
+
+</div>
+
+<div id="modal-overlay">
+  <div id="modal-box">
+    <div id="modal-title">// EXPLAIN TEST</div>
+    <div id="modal-sub"></div>
+    <div id="modal-body"></div>
+    <button class="btn secondary" id="modal-close">Close</button>
+  </div>
+</div>
+
+<script>
+// ---- Shared: toast notifications ----
+function toast(msg, type){
+  type = type || 'ok';
+  const stack = document.getElementById('toast-stack');
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  const icon = type === 'ok'
+    ? '<svg class="icon" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.6"/><path d="M8 12.5l2.5 2.5L16 9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    : '<svg class="icon" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.6"/><path d="M12 7v6M12 16.5v.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+  el.innerHTML = `${icon}<span class="msg">${msg}</span><span class="close">&times;</span>`;
+  stack.appendChild(el);
+  const remove = () => { el.classList.add('leaving'); setTimeout(() => el.remove(), 200); };
+  el.querySelector('.close').addEventListener('click', remove);
+  setTimeout(remove, 4500);
+}
+
+// ---- Shared: explain modal (used on dashboard) ----
+async function openExplainModal(suiteKey, testName){
+  const overlay = document.getElementById('modal-overlay');
+  overlay.classList.add('show');
+  document.getElementById('modal-sub').textContent = `${suiteKey} → ${testName}`;
+  document.getElementById('modal-body').innerHTML = 'Asking the AI<span class="typing-cursor"></span>';
+  try{
+    const res = await fetch('/api/explain', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({suite_key: suiteKey, test_name: testName})
+    });
+    const data = await res.json();
+    if(!data.ok){
+      document.getElementById('modal-body').innerHTML = `<span style="color:var(--red);">${data.error}</span>`;
+      toast('Explain failed: ' + data.error, 'error');
+      return;
+    }
+    typewrite(document.getElementById('modal-body'), data.explanation);
+  }catch(e){
+    document.getElementById('modal-body').innerHTML = `<span style="color:var(--red);">Request failed: ${e}</span>`;
+  }
+}
+function typewrite(el, text){
+  el.textContent = ''; let i = 0;
+  const speed = Math.max(6, Math.min(18, 1200 / text.length));
+  (function step(){ if(i <= text.length){ el.textContent = text.slice(0, i); i++; setTimeout(step, speed); } })();
+}
+document.getElementById('modal-close').addEventListener('click', () => document.getElementById('modal-overlay').classList.remove('show'));
+document.getElementById('modal-overlay').addEventListener('click', (e) => { if(e.target.id === 'modal-overlay') document.getElementById('modal-overlay').classList.remove('show'); });
+
+{% block extra_script %}{% endblock %}
+</script>
+</body>
+</html>

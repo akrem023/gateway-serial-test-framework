@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+{% block title %}Add Test · AI — Gateway Test Framework{% endblock %}
+
+{% block extra_style %}
+  .page-head{ margin-bottom:20px; }
+  .page-head h2{ font-family:var(--mono-head); font-size:18px; color:var(--text); display:flex; align-items:center; gap:10px; }
+  .page-head p{ font-size:12px; color:var(--text-dim); margin-top:6px; }
+  .layout{ display:grid; grid-template-columns: 1fr 1fr; gap:20px; align-items:start; }
+  @media (max-width: 940px){ .layout{ grid-template-columns: 1fr; } }
+  .icon-badge{ width:22px; height:22px; }
+
+  .ai-orb{ width:16px; height:16px; display:inline-block; }
+  @keyframes orb-spin{ to{ transform: rotate(360deg); } }
+  .ai-orb.spin{ animation: orb-spin 1.2s linear infinite; }
+
+  .example-chip{
+    display:inline-block; font-size:10.5px; padding:5px 10px; border-radius:20px;
+    background:rgba(79,227,161,0.06); border:1px solid var(--line-soft); color:var(--text-dim);
+    cursor:pointer; margin:3px 5px 3px 0; transition: all .12s;
+  }
+  .example-chip:hover{ border-color:var(--phosphor-dim); color:var(--phosphor); }
+{% endblock %}
+
+{% block content %}
+
+  <div class="page-head">
+    <h2>
+      <svg class="icon-badge" viewBox="0 0 24 24" fill="none"><path d="M12 3l2.2 5.2L19.5 10l-5.3 1.8L12 17l-2.2-5.2L4.5 10l5.3-1.8L12 3z" stroke="var(--phosphor)" stroke-width="1.3" stroke-linejoin="round"/></svg>
+      Add Test — AI Assisted
+    </h2>
+    <p>Describe the test in plain English. The AI extracts fields, grounded against real commands already used in this codebase — never invents gateway syntax.</p>
+  </div>
+
+  <div class="layout">
+    <div class="panel">
+      <h2><span class="t">Describe Your Test</span></h2>
+
+      <div class="field">
+        <textarea id="ai-desc" placeholder='e.g. Create a test called wan_dhcp_pppoe_check that runs pcb_cli "NMC.getWanModeList()" and checks the output contains both DHCP and PPPoE, with an 8 second timeout'></textarea>
+      </div>
+
+      <div style="margin-bottom:14px;">
+        <span class="example-chip" data-fill='Create a test called wan_dhcp_pppoe_check that runs pcb_cli "NMC.getWanModeList()" and checks the output contains both DHCP and PPPoE, with an 8 second timeout'>WAN mode example</span>
+        <span class="example-chip" data-fill='Create a test called wan_status_check that runs pcb_cli "NMC.getWANStatus()" and checks the output contains Connected, with a 5 second timeout'>WAN status example</span>
+      </div>
+
+      <div class="actions">
+        <button class="btn" id="btn-extract">
+          <svg class="ai-orb" id="ai-orb" viewBox="0 0 24 24" fill="none" style="vertical-align:-3px; margin-right:5px;"><path d="M12 3l2.2 5.2L19.5 10l-5.3 1.8L12 17l-2.2-5.2L4.5 10l5.3-1.8L12 3z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+          Extract Fields
+        </button>
+      </div>
+      <div id="ai-alert"></div>
+
+      <div id="fields-block" style="margin-top:18px; display:none;">
+        <h2 style="margin-top:4px;"><span class="t">Review &amp; Edit</span></h2>
+        <div class="field">
+          <label>Test name (snake_case) <span class="default-badge" id="badge-name"></span></label>
+          <input id="f-name">
+        </div>
+        <div class="field">
+          <label>AI Summary <span class="default-badge" id="badge-summary"></span></label>
+          <input id="f-summary">
+        </div>
+        <div class="field">
+          <label>Shell command <span class="default-badge" id="badge-command"></span></label>
+          <input id="f-command">
+        </div>
+        <div class="field">
+          <label>Description <span class="default-badge" id="badge-description"></span></label>
+          <input id="f-description">
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label>Timeout (seconds) <span class="default-badge" id="badge-timeout"></span></label>
+            <input id="f-timeout" value="5">
+          </div>
+          <div class="field">
+            <label>Registration key</label>
+            <input id="f-key" placeholder="defaults to test name">
+          </div>
+        </div>
+        <div class="field">
+          <label>Expected output substring <span class="default-badge" id="badge-expected"></span></label>
+          <input id="f-expected">
+        </div>
+        <div class="field">
+          <label>Validator expression (on variable o) <span class="default-badge" id="badge-validator"></span></label>
+          <input id="f-validator">
+        </div>
+        <div class="actions">
+          <button class="btn" id="btn-preview">Build Preview</button>
+        </div>
+        <div id="preview-alert"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2><span class="t">Preview</span></h2>
+      <div id="summary-box" class="alert" style="display:none; margin-bottom:12px;"></div>
+      <div class="code-box" id="code-box"><span class="placeholder">// preview will appear here after you extract and build</span></div>
+      <div class="actions" id="save-actions" style="display:none;">
+        <button class="btn" id="btn-save">Confirm &amp; Save</button>
+      </div>
+    </div>
+  </div>
+
+{% endblock %}
+
+{% block extra_script %}
+let currentPreviewCode = null;
+let currentKey = null;
+
+document.querySelectorAll('.example-chip').forEach(chip => {
+  chip.addEventListener('click', () => { document.getElementById('ai-desc').value = chip.dataset.fill; });
+});
+
+function setField(id, badgeId, value){
+  document.getElementById(id).value = value ?? '';
+  document.getElementById(badgeId).textContent = (value !== null && value !== undefined && value !== '') ? 'AI-filled' : '';
+}
+
+// Shows the success toast, locks the Save button, and sends the user
+// back to the dashboard after 5s so they can start another test.
+function saveSuccess(message){
+  toast('✓ ' + message, 'ok');
+  const btn = document.getElementById('btn-save');
+  if(btn){ btn.disabled = true; btn.textContent = 'Saved — redirecting…'; }
+  setTimeout(() => { window.location.href = '/'; }, 5000);
+}
+document.getElementById('btn-extract').addEventListener('click', async () => {
+  const desc = document.getElementById('ai-desc').value.trim();
+  document.getElementById('ai-alert').innerHTML = '';
+  if(!desc){ document.getElementById('ai-alert').innerHTML = '<div class="alert error">Please describe the test first.</div>'; return; }
+
+  const btn = document.getElementById('btn-extract');
+  const orb = document.getElementById('ai-orb');
+  btn.disabled = true; orb.classList.add('spin');
+  const originalText = btn.innerHTML;
+  btn.innerHTML = orb.outerHTML + ' Extracting…';
+  document.getElementById('ai-orb').classList.add('spin');
+
+  try{
+    const res = await fetch('/api/extract', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({description: desc}) });
+    const data = await res.json();
+    if(!data.ok){
+      document.getElementById('ai-alert').innerHTML = `<div class="alert error">${data.error}</div>`;
+      document.getElementById('fields-block').style.display = '';
+      return;
+    }
+    const f = data.fields;
+    setField('f-name', 'badge-name', f.name);
+    setField('f-summary', 'badge-summary', f.summary);
+    setField('f-command', 'badge-command', f.command);
+    setField('f-description', 'badge-description', f.description);
+    setField('f-timeout', 'badge-timeout', f.timeout || 5);
+    setField('f-expected', 'badge-expected', f.validate_func ? '' : f.expected_output);
+    setField('f-validator', 'badge-validator', f.validate_func);
+    document.getElementById('fields-block').style.display = '';
+    document.getElementById('ai-alert').innerHTML = '<div class="alert ok">Fields extracted — review and edit below, then build a preview.</div>';
+  }catch(e){
+    document.getElementById('ai-alert').innerHTML = `<div class="alert error">Request failed: ${e}</div>`;
+    document.getElementById('fields-block').style.display = '';
+  }finally{
+    btn.disabled = false;
+    btn.innerHTML = originalText;
+  }
+});
+
+document.getElementById('btn-preview').addEventListener('click', async () => {
+  document.getElementById('preview-alert').innerHTML = '';
+  const payload = {
+    name: document.getElementById('f-name').value,
+    summary: document.getElementById('f-summary').value,
+    command: document.getElementById('f-command').value,
+    description: document.getElementById('f-description').value,
+    timeout: document.getElementById('f-timeout').value,
+    expected_output: document.getElementById('f-expected').value,
+    validate_func: document.getElementById('f-validator').value,
+    suite_name: document.getElementById('f-name').value,
+    suite_description: document.getElementById('f-description').value,
+    registration_key: document.getElementById('f-key').value,
+  };
+  try{
+    const res = await fetch('/api/preview', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+    const data = await res.json();
+    if(!data.ok){ document.getElementById('preview-alert').innerHTML = `<div class="alert error">${data.error}</div>`; return; }
+    currentPreviewCode = data.code;
+    currentKey = data.registration_key;
+    const summaryBox = document.getElementById('summary-box');
+    summaryBox.style.display = '';
+    if(data.summary){
+      summaryBox.textContent = '💬 ' + data.summary;
+      summaryBox.className = 'alert ok';
+    } else {
+      summaryBox.textContent = '(No AI summary was generated for this test.)';
+      summaryBox.className = 'alert warn';
+    }
+    document.getElementById('code-box').textContent = data.code;
+    document.getElementById('save-actions').style.display = 'flex';
+    document.getElementById('preview-alert').innerHTML = data.key_taken
+      ? `<div class="alert warn">TEST_SUITES["${data.registration_key}"] already exists. Saving will ask to confirm overwrite.</div>`
+      : `<div class="alert ok">Preview ready. Review the code, then confirm & save.</div>`;
+  }catch(e){
+    document.getElementById('preview-alert').innerHTML = `<div class="alert error">Request failed: ${e}</div>`;
+  }
+});
+
+document.getElementById('btn-save').addEventListener('click', async () => {
+  if(!currentPreviewCode) return;
+  try{
+    const res = await fetch('/api/save', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({code: currentPreviewCode, registration_key: currentKey}) });
+    const data = await res.json();
+    if(!data.ok){
+      if(data.duplicate){
+        if(confirm(data.error + '\n\nOverwrite anyway?')){
+          const res2 = await fetch('/api/save', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({code: currentPreviewCode, registration_key: currentKey, force_overwrite:true}) });
+          const data2 = await res2.json();
+          if(data2.ok){ saveSuccess(data2.message); }
+          else{ toast(data2.error, 'error'); }
+        }
+        return;
+      }
+      toast(data.error, 'error');
+      return;
+    }
+    saveSuccess(data.message);
+  }catch(e){
+    toast('Request failed: ' + e, 'error');
+  }
+});
+{% endblock %}
